@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // 1. GLOBAL HELPERS
+    // -------------------------------------------------------------------------
+    
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isAdmin() { return isSignedIn() && (request.auth.token.email == 'tepnhatminh@gmail.com' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'); }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // -------------------------------------------------------------------------
+    // 2. ENTITY VALIDATION
+    // -------------------------------------------------------------------------
+    
+    function isValidUser(data) {
+      return data.username is string && data.username.size() <= 64 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.uid == request.auth.uid &&
+             (data.get('role', 'user') == 'user' || isAdmin());
+    }
+    
+    function isValidPost(data) {
+      return data.authorUsername is string &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.timestamp is string &&
+             data.groupId in ['roblox', 'gtd', 'ehw', 'feedback'];
+    }
+    
+    function isValidNotification(data) {
+      return data.sender is string &&
+             data.receiver is string &&
+             data.content is string && data.content.size() <= 2000 &&
+             data.timestamp is string &&
+             data.type in ['feedback', 'system', 'message'];
+    }
+    
+    function isValidDM(data) {
+      return data.sender == request.auth.uid &&
+             data.receiver is string &&
+             data.content is string && data.content.size() <= 5000 &&
+             data.timestamp is string;
+    }
+    
+    function isValidApp(data) {
+      return data.name is string && data.name.size() <= 100 &&
+             data.url is string && data.url.size() <= 500;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. DEFAULT DENY
+    // -------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. COLLECTIONS
+    // -------------------------------------------------------------------------
+
+    // USERS
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                    isValidUser(incoming()) &&
+                    (isAdmin() || (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'username'])));
+    }
+
+    // POSTS
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isVerified() && isValidPost(incoming());
+      allow update: if isVerified() && (
+        (existing().authorUsername == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['content', 'likes', 'comments'])) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin() || (isVerified() && existing().authorUsername == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username);
+    }
+
+    // NOTIFICATIONS
+    match /notifications/{notifId} {
+      allow list: if isSignedIn() && (resource.data.receiver == 'all' || resource.data.receiver == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username || resource.data.sender == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username);
+      allow get: if isSignedIn() && (resource.data.receiver == 'all' || resource.data.receiver == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username);
+      allow create: if isVerified() && isValidNotification(incoming());
+      allow update: if isVerified() && 
+                    (existing().receiver == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username && 
+                     incoming().diff(existing()).affectedKeys().hasOnly(['read']));
+      allow delete: if isAdmin();
+    }
+
+    // DIRECT MESSAGES
+    match /direct_messages/{dmId} {
+      allow list: if isSignedIn() && (resource.data.sender == request.auth.uid || resource.data.receiver == request.auth.uid);
+      allow create: if isVerified() && isValidDM(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // CUSTOM APPS
+    match /custom_apps/{appId} {
+      allow read: if isSignedIn();
+      allow create: if isVerified() && isValidApp(incoming());
+      allow update, delete: if isAdmin() || (isVerified() && (existing().developer == request.auth.uid || existing().developer == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username));
+    }
+  }
+}

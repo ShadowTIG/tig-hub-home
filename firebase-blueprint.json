@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "isBanned": { "type": "boolean" },
+        "uid": { "type": "string" }
+      },
+      "required": ["username", "name", "uid"]
+    },
+    "CommunityPost": {
+      "title": "Community Post",
+      "description": "A blog post or feedback entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "likes": { "type": "number" },
+        "groupId": { "type": "string" },
+        "fileInfo": { "type": "object" },
+        "comments": { "type": "array" }
+      },
+      "required": ["authorUsername", "content", "timestamp", "groupId"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or user notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string" },
+        "receiver": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "type": { "type": "string" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["sender", "receiver", "content", "timestamp", "type"]
+    },
+    "DirectMessage": {
+      "title": "Direct Message",
+      "description": "One-on-one message between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string" },
+        "receiver": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["sender", "receiver", "content", "timestamp"]
+    },
+    "AppItem": {
+      "title": "App Item",
+      "description": "Custom app entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "category": { "type": "string" },
+        "url": { "type": "string" },
+        "color": { "type": "string" },
+        "developer": { "type": "string" }
+      },
+      "required": ["name", "url"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Collection of user profiles"
+    },
+    "posts": {
+      "schema": "CommunityPost",
+      "description": "Collection of community blog posts and feedback"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Collection of notifications for users"
+    },
+    "direct_messages": {
+      "schema": "DirectMessage",
+      "description": "Private messages between users"
+    },
+    "custom_apps": {
+      "schema": "AppItem",
+      "description": "User-added custom applications"
+    }
+  }
+}
